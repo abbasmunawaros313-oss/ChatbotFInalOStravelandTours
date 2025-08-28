@@ -565,10 +565,10 @@ Ask me about visa price, docs, processing time — or click a country below.`);
       const q = document.createElement("div");
       q.className="bot-message";
       q.innerHTML = `<div class="quick">
-        <button onclick="quickAsk('price')">Price</button>
-        <button onclick="quickAsk('processing')">Processing time</button>
-        <button onclick="quickAsk('docs')">Documents</button>
-        <button onclick="quickAsk('contact')">Contact</button>
+        <button onclick="quickAsk('price')">Click to see : Price</button>
+        <button onclick="quickAsk('processing')">Click to see : Processing time</button>
+        <button onclick="quickAsk('docs')">Click to see : Documents</button>
+        <button onclick="quickAsk('contact')">Click to see : Contact</button>
       </div>`;
       messages.appendChild(q); messages.scrollTop = messages.scrollHeight;
     }
