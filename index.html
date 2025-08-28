@@ -51,12 +51,27 @@
   cursor:pointer;text-align:left;font-weight:600;color:var(--text);
 }
 .btnn{
-  padding: 10px;
-  border: none;
-  background-color: #e5efff;
-  border-radius: 10px ;
-  color: black;
+  
+   display: flex;
+   justify-content: center;
+   align-items: center;
+   flex-direction: column;
+   gap:2px;
+   padding: 7px;
 
+   background-color: rgba(220, 220, 220, 0.623);
+   font-size: medium;
+   color: rgb(0, 0, 0);
+   outline: none;
+   cursor: pointer;
+   border-radius: 10px;
+
+}
+.dispara{
+     align-items: center;
+     border: 1px solid gray;
+     border-radius: 10px;
+     padding: 5px;
 }
 .country-btn:hover{background:#f9fafb}
 
@@ -573,10 +588,11 @@ Ask me about visa price, docs, processing time — or click a country below.`);
       const q = document.createElement("div");
       q.className="bot-message";
       q.innerHTML = `<div class="quick">
-        <button class="btnn" onclick="quickAsk('price')">Click to see : Price</button>
-        <button class="btnn" onclick="quickAsk('processing')">Click to see : Processing time</button>
-        <button class="btnn" onclick="quickAsk('docs')">Click to see : Documents</button>
-        <button class="btnn" onclick="quickAsk('contact')">Click to get : Contact</button>
+       <p class="dispara">Tap the desire Option : </p>
+        <button class="btnn" onclick="quickAsk('price')"> Price</button>
+        <button class="btnn" onclick="quickAsk('processing')"> Processing time</button>
+        <button class="btnn" onclick="quickAsk('docs')"> Documents</button>
+        <button class="btnn" onclick="quickAsk('contact')">Contact</button>
       </div>`;
       messages.appendChild(q); messages.scrollTop = messages.scrollHeight;
     }
