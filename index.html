@@ -557,7 +557,7 @@ Ask me about visa price, docs, processing time — or click a country below.`);
       div.className = who === "bot" ? "bot-message" : "user-message";
       div.innerText = text;
       messages.appendChild(div);
-      messages.scrollTop = messages.scrollHeight;
+   
     }
 
     function showCountryGrid(){
@@ -635,6 +635,11 @@ Ask me about visa price, docs, processing time — or click a country below.`);
       if(!msg) return;
       addUser(original);
       input.value = "";
+        const respondWithDelay = (response) => {
+    setTimeout(() => {
+      addBot(response);
+    }, 1500);
+      }
 
       // 1) block work/study visa
       if(textIncludesAny(msg,["work","job","employment","study","student"])){
@@ -651,7 +656,13 @@ Ask me about visa price, docs, processing time — or click a country below.`);
       // 3) country mentioned directly
       for(const name of Object.keys(visaData)){
         const key = name.toLowerCase();
-        if(msg.includes(key)){ showCountryDetail(name); return; }
+      if (msg.includes(key)) {
+      respondWithDelay(`Checking details for ${name}...`);
+      setTimeout(() => {
+        showCountryDetail(name);
+      }, 1500); // 1.5-second delay for detail display
+      return;
+    }
       }
 
       // 4) follow-up using memory
