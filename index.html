@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>OS Travel & Tours Chatbot</title>
+  <style>
+    :root{
+      --brand:#0078ff;
+      --bg:#ffffff;
+      --muted:#f6f7fb;
+      --text:#1f2937;
+      --soft:#e5efff;
+    }
+    *{box-sizing:border-box}
+    .chatbot-button{
+      position:fixed;bottom:20px;right:20px;width:64px;height:64px;border-radius:50%;
+      background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;
+      font-size:28px;cursor:pointer;box-shadow:0 10px 25px rgba(0,0,0,.18);z-index:1000
+    }
+    .chatbot-container{
+      position:fixed;bottom:96px;right:20px;width:380px;height:560px;background:var(--bg);
+      border-radius:16px;box-shadow:0 20px 50px rgba(0,0,0,.22);display:none;flex-direction:column;
+      overflow:hidden;font-family:Inter,system-ui,Arial,sans-serif;z-index:1000;border:1px solid #e5e7eb
+    }
+    .chatbot-header{
+      background:linear-gradient(135deg,var(--brand),#2b8cff);color:#fff;padding:14px 16px;
+      font-weight:700;text-align:center;letter-spacing:.2px
+    }
+    .chatbot-messages{flex:1;padding:12px;overflow-y:auto;font-size:14px;background:var(--muted)}
+    .chatbot-input{display:flex;border-top:1px solid #e5e7eb;background:#fff}
+    .chatbot-input input{flex:1;padding:12px;border:none;outline:none;font-size:14px}
+    .chatbot-input button{padding:12px 16px;border:none;background:var(--brand);color:#fff;cursor:pointer;font-weight:600}
+
+    .bot-message,.user-message{
+      margin:8px 0;padding:10px 12px;border-radius:10px;max-width:85%;clear:both;white-space:pre-wrap;line-height:1.45
+    }
+    .bot-message{background:#fff;float:left;border:1px solid #eef2ff}
+    .user-message{background:var(--brand);color:#fff;float:right}
+
+    .pill{display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background:var(--soft);
+      color:var(--brand);font-size:12px;font-weight:600;margin:2px 6px 0 0;border:1px solid #dbe8ff;cursor:pointer}
+    .pill:hover{background:#cfe0ff}
+
+    .country-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:6px}
+    .country-btn{
+      border:1px solid #e5e7eb;border-radius:10px;padding:10px;background:#fff;cursor:pointer;text-align:left;
+      font-weight:600;color:var(--text);transition:transform .06s ease, box-shadow .06s ease
+    }
+    .country-btn:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(0,0,0,.08)}
+    .muted{color:#6b7280}
+    .kicker{font-size:12px;color:#6b7280;margin-bottom:4px}
+    .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px}
+    .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+    .tag{background:#f3f4f6;border:1px solid #e5e7eb;border-radius:8px;padding:4px 8px;font-size:12px}
+    .quick{display:inline-flex;gap:8px;margin-top:8px}
+    .quick button{border:1px solid #e5e7eb;background:#fff;border-radius:8px;padding:6px 10px;cursor:pointer}
+    .quick button:hover{background:#f9fafb}
+  </style>
+</head>
+<body>
+
+  <!-- Floating Button -->
+  <div class="chatbot-button" onclick="toggleChat()">💬</div>
+
+  <!-- Chatbox -->
+  <div class="chatbot-container" id="chatbot">
+    <div class="chatbot-header">OS Travel & Tours</div>
+    <div class="chatbot-messages" id="messages"></div>
+    <div class="chatbot-input">
+      <input type="text" id="userInput" placeholder="Ask about visa price, docs, processing…"/>
+      <button onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+
+  <script>
+    // ======================== Config =========================
+    const API_KEY = "AIzaSyCduUjLNhVTo8QVBO6Dz5kpi7oFk99shX4"; // ← put your Gemini key here
+    const CONTACT = `Located in: Alay Plaza
+Address: Office # 3, Aaly Plaza, Fazal-e-Haq Road, Block E G 6/2 Blue Area, Islamabad, 44000
+Phone: 051-2120700-701,0333-5542877`;
+
+    // ===================== Data (from ostravels.com) =====================
+    // Fees/processing pulled where available on site pages; otherwise "Contact for latest".
+    // Sources: Visa list + country subpages + Schengen file pages.
+    const visaData = {
+      // Asia (eVisa / direct)
+      "Malaysia": { type:"eVisa", price:"  Normal : 13000/Pkr , Urgent : 25000pkr", processing:"7–10 working days", stay:" 30 Days {Visa Is Extendable In Malaysia }", docs:[
+  "Original Passport (Validity at least 9 months)",
+  "04 Pictures with White Background",
+  "Last Six Month Bank Statement",
+  "Bank Accounts Maintenance Letter",
+  "Visa Request Letter",
+  "NTN (National Tax No.) (If Applicable)",
+  "Return Air Ticket"
+]
+, src:"/visa/" },
+      "Singapore": { type:"Embassy / online submission", price:" 18000 /Pkr", processing:" 7-10  Working Days", stay:" 30 Days", docs:[
+  "Original Passport (Validity at least 6 months)",
+  "04 Pictures with White Background (35mm x 50mm)",
+  "CNIC Photo Copy",
+  "Last Six Month Bank Statement",
+  "Bank Accounts Maintenance Letter",
+  "Visa Request Letter",
+  "Invitation Letter from Singaporean Citizen / Company",
+  "NTN (National Tax No.) (If Applicable)",
+  "Return Air Ticket"
+]
+, src:"/visa/singapore-visa/" },
+      "Hong Kong": { type:"Online via HK Immigration", price:"   20000pkr ", processing:"Up to 4 weeks", stay:" Acording to your itinerary  ", docs:[
+  "Valid Passport or Travel Document",
+  "Recent Passport-Sized Photograph",
+  "National Identity Card (ID)",
+  "Completed Visa Application Form",
+  "Proof of Financial Means (Bank Statements or Credit Card Statements)",
+  "Business Registration and/or Incorporation",
+  "Business Letter Head",
+  "NTN",
+  "Chamber of Commerce (If Available)",
+  "Tax Returns (If Available)",
+  "Proof of Onward or Return Travel Arrangements (Tickets etc.)",
+  "Letter of Invitation from Hong Kong-based Company or Letter of Guarantee from Applicant’s Company (If Available)",
+  "Hotel Booking"
+]
+, src:"/schengen-visa-file-processing/hong-kong-visa/" },
+      "Indonesia": { type:"eVisa/VOA (subject to policy)", price:"e-visa :29000/pkr , Sticker-visa : 34000 /pkr", processing:"     03-05  Working Days  { Varies Case To Case }", stay:" 30 Days", docs:[
+  "Original Passport (Validity at least 8 months)",
+  "04 Pictures with White Background (35mm x 50mm)",
+  "CNIC Photo Copy",
+  "Last Six Month Bank Statement",
+  "Bank Accounts Maintenance Letter",
+  "Visa Request Letter",
+  "NTN (National Tax No.) (If Applicable)",
+  "Return Air Ticket",
+  "Covid Vaccine Certificate with Booster Dose"
+]
+, src:"/visa/" },
+      "Thailand": { type:"Tourist visa / eVOA", price:"15000 / Pkr ", processing:"08 Working Days ", stay:" 60 Days", docs:[
+  "Original Passport (Validity at least 6 months)",
+  "04 Pictures with White Background",
+  "CNIC Photo Copy",
+  "Last Six Month Bank Statement",
+  "Bank Accounts Maintenance Letter",
+  "NTN (National Tax No.)",
+  "Visa Request Letter",
+  "Confirm Return Air Ticket (We’ll arrange for you)",
+  "Hotel Booking (We can arrange for you)",
+  "Visa Application Form (We’ll arrange for you)"
+]
+, src:"/visa/thailand-visa/" },
+      "China": { type:"Embassy", price:"Jerry’s Service Charges : 6500  /Pkr ", processing:"15  Working Days ", stay:" 30 Days", docs:[
+  "Original Passport (Validity at least 6 months)",
+  "04 Pictures with White Background (35mm x 50mm)",
+  "CNIC Photo Copy",
+  "Last Six Month Bank Statement",
+  "Bank Accounts Maintenance Letter",
+  "Visa Request Letter",
+  "Invitation Letter from China (Duly Attested)",
+  "NTN (National Tax No.) (If Applicable)",
+  "Chamber of Commerce Membership Certificate",
+  "Return Air Ticket"
+]
+, src:"/visa/" },
+      "Vietnam": { type:"eVisa", price:" 25,000 /Pkr", processing:"07  Working Days ", stay:" 30 Days ", docs:[
+  "Original Passport (Validity at least 6 months)",
+  "04 Pictures with White Background (35mm x 50mm)",
+  "Visa Approval Letter from Vietnam",
+  "CNIC Photo Copy",
+  "Last Six Month Bank Statement",
+  "Bank Accounts Maintenance Letter",
+  "Visa Request Letter",
+  "NTN (National Tax No.) (If Applicable)",
+  "Return Air Ticket"
+]
+, src:"/visa/" },
+      "Cambodia": { type:"eVisa", price:"  20,000 /Pkr", processing:"  03 working days", stay:" 30 Days", docs:[
+  "Passport 1st & 2nd Page Scan Copy (Validity at least 6 months)",
+  "01 Picture with White Background (35mm x 50mm)",
+  "CNIC Photo Copy",
+  "Covid Vaccine Certificate",
+  "Hotel Booking",
+  "Ticket Booking",
+  "Bank Statement (Last 6 months)"
+]
+, src:"/visa/cambodia-visa/" },
+      "Nepal": { type:"Embassy/VOA (policy dependent)", price:" 15,000 /Pkr ", processing:"03 to 5  Working Days ", stay:" 30 Days ", docs:[
+  "Original Passport (Validity at least 6 months)",
+  "04 Pictures with White Background (35mm x 50mm)",
+  "Online Visa Application",
+  "Bank Statement",
+  "Visa Request Letter",
+  "Return Air Ticket",
+  "Hotel Booking"
+]
+, src:"/visa/" },
+      "Sri Lanka": { type:"ETA", price:"  15000 / Pkr ", processing:"   14 Working Days ", stay:"varies", docs:[
+  "Original Passport (Validity at least 6 months)",
+  "04 Pictures with White Background",
+  "CNIC Photo Copy",
+  "Last Six Month Bank Statement",
+  "Bank Accounts Maintenance Letter",
+  "NTN (National Tax No.)",
+  "Visa Request Letter",
+  "Confirm Return Air Ticket (We’ll arrange for you)",
+  "Hotel Booking (We can arrange for you)",
+  "Visa Application Form (We’ll arrange for you)"
+]
+, src:"/visa/" },
+      "Philippines": {
+        type:"Embassy",
+        price:"File Charges : 25000 pkr , Embassy fee 12000 pkr",
+        processing:"Contact for latest",
+        stay:"varies by category",
+        docs:[
+  "Passport valid for at least 6 months beyond the contemplated period of stay in the Philippines",
+  "Original bank statement attested by the Ministry of Foreign Affairs",
+  "2 passport-size photographs",
+  "Original Police Character Certificate/Clearance (issued within 6 months, attested by Ministry of Foreign Affairs)",
+  "Return air ticket booking with itinerary flight details",
+  "Hotel booking",
+  "Business Letter Head / Certificate of Employment (if employed)",
+  "NTN",
+  "Visa application"
+]
+,
+        src:"/schengen-visa-file-processing/philippine-visa/"
+      },
+      "Saudi Arabia": { type:"eVisa (special conditions) / Embassy", price:" 115,000 /Pkr", processing:"05 to 7  Working Days", stay:"90 Days  ", docs:[
+  "Original Passport (Validity at least 6 months)",
+  "04 Pictures with White Background (35mm x 50mm)",
+  "Invitation Letter",
+  "ID Card Copy"
+]
+, src:"/visa/saudi-arabia-visa/" },
+      "Azerbaijan": {
+        type:"eVisa",
+        price:"13000 /Pkr",
+        processing:"10-15  Working Days",
+        stay:"Single entry, 30 days",
+        docs:[
+  "Original Passport (Validity at least 6 months)",
+  "04 Pictures with White Background (35mm x 50mm)",
+  "CNIC Photo Copy",
+  "Last Six Month Bank Statement",
+  "Bank Accounts Maintenance Letter",
+  "Visa Request Letter",
+  "Invitation Letter From Azerbaijan Telex",
+  "NTN (National Tax No.) (If Applicable)",
+  "Return Air Ticket"
+]
+,
+        src:"/visa/azerbaijan-visa/"
+      },
+      "Uzbekistan": {
+        type:"Embassy",
+        price:"15 Days (140$) , 30 Day (160$)",
+        processing:"12-15  Working Days",
+        stay:"30 days (tourist)",
+        docs:[
+  "Original Passport (Validity more than 6 months)",
+  "04 Pictures with White Background (35mm x 50mm)",
+  "Last Six Month Bank Statement",
+  "Bank Accounts Maintenance Letter",
+  "NTN (National Tax No.)",
+  "Visa Request Letter",
+  "CNIC Photo Copy",
+  "Return Air Ticket",
+  "Visa form duly filled",
+  "Telex from Uzbekistan"
+]
+,
+        src:"/visa/uzbekistan-visa/"
+      },
+      "Tajikistan": { type:"Embassy / eVisa portal", price:" 105$", processing:"07-10  Working Days ", stay:"  45 Days", docs:[
+  "Original Passport (Validity at least 6 months)",
+  "04 Pictures with White Background (35mm x 50mm)",
+  "CNIC Photo Copy",
+  "Last Six Month Bank Statement",
+  "Bank Accounts Maintenance Letter",
+  "Visa Request Letter",
+  "NTN (National Tax No.) (If Applicable)",
+  "Return Air Ticket",
+  "Invitation Letter"
+]
+, src:"/visa/tajikistan-visa/" },
+      "Kyrgyzstan": {
+        type:"Embassy / eVisa (policy dependent)",
+        price:"  250/- Usd ",
+        processing:" Contact for more",
+        stay:"varies",
+        docs:[
+  "A completed visa application form",
+  "A valid passport with at least six months of validity remaining beyond your planned stay in Kyrgyzstan",
+  "Passport-sized photograph",
+  "Proof of travel arrangements, such as a flight itinerary or hotel reservation",
+  "Proof of sufficient funds to cover your stay in Kyrgyzstan",
+  "A letter of invitation from a Kyrgyzstan-based organization, if applicable",
+  "Visa fee payment receipt"
+]
+,
+        src:"/visa/kyrgyzstan-visa/"
+      },
+      "Kazakhstan": {
+        type:"Embassy",
+        price:"  60 /USD ",
+        processing:"    03 to 5  Working Days ",
+        stay:"  Stay  30 Days  ",
+        docs:[
+  "Original Passport (minimum 6 months valid)",
+  "ID Card copy",
+  "Four passport size pictures (white background 33×48 mm size)",
+  "Personal Bank statement (6 months)",
+  "Bank account maintenance covering letter",
+  "Visa Request letter to Embassy (preferably on company letterhead)",
+  "Chamber of commerce certificate",
+  "Police Character certificate",
+  "Official invitation letter from Nepal Ministry",
+  "Air Ticket (reservation only)",
+  "Hotel Booking"
+],
+        src:"/visa/kazakhstan/"
+      },
+      France: {
+  type: "Schengen Visa (Short-stay up to 90 days)",
+  price: "€90 (short stay) — €100 (long stay, not handled)",
+  processing: "Typically 25 days; may extend up to 45 days",
+  docs: [
+  "Original valid passport (6 months +, 2 blank pages), including old passports",
+  "Photographs – 35 mm × 45 mm, < 6 months old, head covering 70-80%",
+  "Bank statements: Personal (6 months, on bank letterhead, signed + sealed)",
+  "If self-employed: company bank statements (6 months), income tax returns (2-3 years), business registration, letterhead, Chamber of Commerce certificate, proof of proprietorship/partnership",
+  "If employed: salary slips (last 3 months), personal tax returns (last 3 years) or tax deduction certificate, visiting card, employee ID copy",
+  "FRC (Family Registration Certificate) and/or MRC (Marriage Registration Certificate)",
+  "Invitation or sponsorship letter (if any)"
+]
+,
+  src: "/schengen-visa-file-processing/france-visa/"
+},
+"Germany": {
+  type: "Schengen Visa (Short-stay up to 90 days)",
+  price: "€90 (tourist visa)",
+  processing: "15–25 days",
+  docs: [
+    "Passport (valid + old passports)",
+    "Passport copy",
+    "Photo (35×45 mm, head 70–80%)",
+    "Bank statement (last 6 months, with bank stamp & sign)",
+    "— Self-employed: business bank statements, tax returns, business docs",
+    "— Employed: salary slips, tax docs, company ID"
+  ],
+  src: "/schengen-visa-file-processing/germany-visa/"
+},
+"UK": {
+  type: "UK Visit Visa (Tourist)",
+  price: "£127 (up to 6 months), £475 (2 years), £848 (5 years), £1,059 (10 years)",
+  processing: "21 days (may extend up to 50 days)",
+  docs: [
+  "Original passport (6 months +, 2 blank pages), including old passports",
+  "Photographs – 45 mm × 35 mm, < 6 months old, head-to-chin 29-34 mm",
+  "Valid National ID Card copy",
+  "Personal bank statement (6 months, bank letterhead, signed + sealed)",
+  "If self-employed: same business docs as Schengen",
+  "If employed: salary slips (3 months), tax returns (3 years), visiting card, employee ID",
+  "FRC and/or MRC (if applicable)",
+  "Invitation / Sponsor letter (if any)"
+]
+,
+  src: "/schengen-visa-file-processing/united-kingdom-uk-visa/"
+},
+"Spain": {
+  type: "Schengen Visa (Short-stay up to 90 days)",
+  price: "Short Stay Visa : £90  BLS Service Fees :5000/-PKR",
+  processing: "Visa applications are generally processed within 15 days. This period can be extended up to 50 days in particular cases.",
+  docs: [
+  "Original passport (6 months +, 2 blank pages), including old passports",
+  "Photographs – 35 mm × 45 mm, < 6 months old, head covering 70-80%",
+  "Valid National ID Card copy",
+  "Personal bank statement (6 months, bank letterhead, signed + sealed)",
+  "For self-employed: same additional requirements as France (tax returns, business docs, etc.)"
+]
+,
+  src: "/schengen-visa-file-processing/spain-visa/"
+},
+"Italy": {
+  type: "Schengen Visa (Short-stay up to 90 days)",
+  price: "€90 (tourist visa)",
+  processing: "15–25 days",
+  docs:[
+  "Valid passport and any old passports",
+  "Photograph (35 mm × 45 mm, ≤6 months old)",
+  "National identity card (copy)",
+  "Fully completed, printed and signed visa application form",
+  "Personal bank statement (6 months, on bank letterhead, sealed & signed)",
+  "— Self-employed: company bank statement (6 months), tax returns (2–3 years), business registration, business letterhead, Chamber of Commerce certificate, proof of proprietorship/partnership",
+  "— Employed: salary slips (3 months), personal income tax returns (3 years) or tax deduction certificate, visiting card, employee ID card",
+  "Invitation letter (if applicable)",
+  "Police clearance certificate (if applicable)"
+]
+,
+  src: "/schengen-visa-file-processing/italy-visa/"
+},
+"Greece": {
+  type: "Schengen Visa (Short-stay up to 90 days)",
+  price: "Tourist visa: 90 €",
+  processing: "15 and 25 days",
+  docs: [
+  "Valid passport (information pages photocopied)",
+  "Photographs – 35 mm × 45 mm, < 6 months old, head covering 70-80%",
+  "Valid National ID Card copy",
+  "Completed visa application form",
+  "Personal bank statement (6 months, bank letterhead, signed + sealed)",
+  "If self-employed: same additional business documentation as Schengen",
+  "Invitation letter (from Greek citizen or PR holder) with detailed sponsor info",
+  "Police clearance certificate (from Pakistan and any other country lived > 6 months)"
+]
+,
+  src: "/schengen-visa-file-processing/greece-visa/"
+},
+"USA": {
+  type: "USA Visit / B1-B2 Visa",
+  price: "$185 (tourist/business)",
+  processing: "3–5 days (may vary)",
+  docs: [
+    "Passport plus old passports",
+    "Photos (600×600 to 1200×1200 px, head 50–70%)",
+    "Bank statements (6 months, bank letterhead & sign)",
+    "— Self-employed: business docs, tax returns",
+    "— Employed: salary slips, tax docs, company ID",
+    "— Plus: FRC, MRC, invitation/sponsor letter if applicable"
+  ],
+  src: "/schengen-visa-file-processing/united-states-usa-visa/"
+},
+"Poland": {
+  type: "Schengen Visa (Short-stay up to 90 days)",
+  price: "Tourist visa: 90 €",
+  processing: "15 and 25 days",
+  docs: [
+  "Valid passport and any old passports",
+  "Photograph (35 mm × 45 mm, ≤6 months old)",
+  "National identity card (copy)",
+  "Fully completed, printed and signed visa application form",
+  "Personal bank statement (6 months, on bank letterhead, sealed & signed)",
+  "— Self-employed: company bank statement (6 months), tax returns (2–3 years), business registration, business letterhead, Chamber of Commerce certificate, proof of proprietorship/partnership",
+  "— Employed: salary slips (3 months), personal income tax returns (3 years) or tax deduction certificate, visiting card, employee ID card",
+  "Invitation letter (if applicable)",
+  "Police clearance certificate (if applicable)"
+],
+  src: "/schengen-visa-file-processing/greece-visa/"
+},
+"Belgium": {
+  type: "Schengen Visa (Short-stay up to 90 days)",
+  price: "Tourist visa: 90 €",
+  processing: "15 and 25 days",
+  docs: [
+  "Valid passport plus old passports",
+  "Photograph (35–40 mm wide, 45–50 mm high, ≤6 months old)",
+  "National identity card (copy)",
+  "Personal bank statement (6 months, on bank letterhead, sealed & signed)",
+  "— Self-employed: company bank statement (6 months), tax returns, business registration, business letterhead, Chamber of Commerce certificate, proof of proprietorship/partnership",
+  "— Employed: salary slips (3 months), personal tax returns (3 years) or tax deduction certificate, visiting card, employee ID card",
+  "FRC and/or MRC (if applicable)",
+  "Invitation/sponsor letter (if any)"
+],
+  src: "/schengen-visa-file-processing/greece-visa/"
+},
+
+
+
+
+
+
+      "Egypt": { type:"eVisa / Embassy", price:"20000 /Pkr ", processing:"   4- 6 Weeks  Working Days { Varies Case to Case }", stay:"Max 30 Days", docs:[
+  "Original Passport (Validity at least 6 months)",
+  "04 Pictures with White Background (35mm x 50mm)",
+  "CNIC Photo Copy",
+  "Last Six Month Bank Statement",
+  "Bank Accounts Maintenance Letter",
+  "Visa Request Letter",
+  "Invitation Letter from Egypt or Hotel Booking",
+  "NTN (National Tax No.) (If Applicable)",
+  "Return Air Ticket",
+  "Dengue Test"
+]
+, src:"/visa/" },
+      "Turkey": { type:"eVisa / Embassy", price:"   File Charges 10,000 /Pkr ", processing:" 15 to 18  Working Days", stay:"As per your schedule itinerary  ", docs:[
+  "Original Passport (Validity at least 6 months)",
+  "04 Pictures with White Background (35mm x 50mm)",
+  "Online Visa Application",
+  "Bank Statement with Account Maintenance Certificate",
+  "Visa Request Letter",
+  "Return Air Ticket",
+  "Hotel Booking",
+  "FRC or MRC",
+  "Travel Insurance"
+]
+, src:"/visa/" },
+
+     
+    };
+
+    // ===================== UI / Boot =====================
+    let currentCountry = null;
+    const messages = document.getElementById("messages");
+
+    function toggleChat(){
+      const chat = document.getElementById("chatbot");
+      const firstOpen = chat.style.display !== "flex";
+      chat.style.display = firstOpen ? "flex" : "none";
+      if(firstOpen){ boot(); }
+    }
+
+    function boot(){
+      addBot(`👋 Hello! I’m your travel assistant for OS Travel & Tours.
+Ask me about visa price, docs, processing time — or click a country below.`);
+      showCountryGrid();
+      addBot(`📝 Tip: I only handle **tourist/visit visas, tickets & packages**. For work/study visas we currently do not deal.`);
+      addBot(`☎️ Contact:\n${CONTACT}`);
+    }
+
+    function addBot(text){ addMessage(text,"bot"); }
+    function addUser(text){ addMessage(text,"user"); }
+    function addMessage(text, who){
+      const div = document.createElement("div");
+      div.className = who === "bot" ? "bot-message" : "user-message";
+      div.innerText = text;
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    function showCountryGrid(){
+      const wrap = document.createElement("div");
+      wrap.className = "bot-message";
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `<div class="kicker">🌍 Countries we serve</div>`;
+      const grid = document.createElement("div");
+      grid.className = "country-grid";
+      Object.keys(visaData).forEach(name=>{
+        const btn = document.createElement("button");
+        btn.className="country-btn";
+        btn.innerHTML = `${name}`;
+        btn.onclick = ()=> showCountryDetail(name);
+        grid.appendChild(btn);
+      });
+      card.appendChild(grid);
+      wrap.appendChild(card);
+      messages.appendChild(wrap);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    function showCountryDetail(name){
+      currentCountry = name;
+      const d = visaData[name];
+      const docsFormatted = d.docs?.length 
+        ? `📑 Required Documents:\n${d.docs.map(doc => `• ${doc}`).join("\n")}` 
+        : null;
+
+      const block = [
+        `📌 ${name} — ${d.type}`,
+        d.stay ? `🧭 Stay/Validity: ${d.stay}` : null,
+        `💳 Fee: ${d.price}`,
+        `⏳ Processing: ${d.processing}`,
+        docsFormatted,
+        d.src ? `\n🔗 Source: ostravels.com${d.src}` : null
+      ].filter(Boolean).join("\n\n"); // Using double newline for better spacing
+      addBot(block);
+
+      // quick buttons
+      const q = document.createElement("div");
+      q.className="bot-message";
+      q.innerHTML = `<div class="quick">
+        <button onclick="quickAsk('price')">Price</button>
+        <button onclick="quickAsk('processing')">Processing time</button>
+        <button onclick="quickAsk('docs')">Documents</button>
+        <button onclick="quickAsk('contact')">Contact</button>
+      </div>`;
+      messages.appendChild(q); messages.scrollTop = messages.scrollHeight;
+    }
+
+    function quickAsk(kind){
+      if(!currentCountry) return;
+      const d = visaData[currentCountry];
+      if(kind==="price") addBot(`💳 ${currentCountry} visa fee: ${d.price}`);
+      else if(kind==="processing") addBot(`⏳ ${currentCountry} processing time: ${d.processing}`);
+      else if(kind==="docs") {
+        const docsList = d.docs?.length 
+          ? d.docs.map(doc => `• ${doc}`).join("\n")
+          : "Contact for checklist";
+        addBot(`📑 ${currentCountry} Required Documents:\n${docsList}`);
+      }
+      else if(kind==="contact") addBot(`☎️ ${CONTACT}`);
+    }
+
+    // ===================== NLP-ish handling =====================
+    function textIncludesAny(s, arr){ return arr.some(w => s.includes(w)); }
+
+    async function sendMessage(){
+      const input = document.getElementById("userInput");
+      const original = input.value.trim();
+      const msg = original.toLowerCase();
+      if(!msg) return;
+      addUser(original);
+      input.value = "";
+
+      // 1) block work/study visa
+      if(textIncludesAny(msg,["work","job","employment","study","student"])){
+        addBot("⚠️ Sorry, we currently do not deal with work or study visas. We only assist with tourist/visit visas, tickets, packages & Umrah.");
+        return;
+      }
+
+      // 2) contact/location
+      if(textIncludesAny(msg,["address","location","phone","contact","office","number"])){
+        addBot(`📍 Contact details:\n${CONTACT}`);
+        return;
+      }
+
+      // 3) country mentioned directly
+      for(const name of Object.keys(visaData)){
+        const key = name.toLowerCase();
+        if(msg.includes(key)){ showCountryDetail(name); return; }
+      }
+
+      // 4) follow-up using memory
+      if(currentCountry){
+        const d = visaData[currentCountry];
+        if(textIncludesAny(msg,["price","cost","fee","charges"])) { addBot(`💳 ${currentCountry} visa fee: ${d.price}`); return; }
+        if(textIncludesAny(msg,["processing","time","days","duration"])) { addBot(`⏳ ${currentCountry} processing time: ${d.processing}`); return; }
+        if(textIncludesAny(msg,["document","documents","docs","requirements","requirement","paper"])) {
+          const docsList = visaData[currentCountry].docs?.length 
+            ? visaData[currentCountry].docs.map(doc => `• ${doc}`).join("\n") 
+            : "Contact for checklist";
+          addBot(`📑 ${currentCountry} Required Documents:\n${docsList}`); 
+          return; 
+        }
+        if(textIncludesAny(msg,["validity","stay","entry"])) { addBot(`🧭 ${currentCountry} stay/validity: ${d.stay || "Varies by category"}`); return; }
+      }
+
+      // 5) help user choose
+      if(textIncludesAny(msg,["country","list","menu","options","visa"])) {
+        addBot("Here are the countries we deal in — tap to view:");
+        showCountryGrid(); return;
+      }
+
+      // 6) Gemini fallback for general travel queries
+      addBot("…");
+      try{
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`,
+          {
+            method:"POST",
+            headers:{ "Content-Type":"application/json" },
+            body:JSON.stringify({
+              contents:[{parts:[{text:
+`You are OS Travel & Tours Assistant.
+Only answer about tourist/visit visas, air tickets, travel packages, Umrah.
+If user asks about work or study visas: politely say we do not deal.
+Keep answers short, friendly, and Pakistan-context aware.
+User: ${original}`}]}]
+            })
+          }
+        );
+        const data = await res.json();
+        const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, I didn’t get that. Please pick a country from the list.";
+        messages.lastChild.innerText = reply;
+      }catch(e){
+        console.error(e);
+        messages.lastChild.innerText = "⚠️ System is busy. Please call us at 051-2120700-701,0333-5542877";
+      }
+    }
+  </script>
+</body>
+</html>
