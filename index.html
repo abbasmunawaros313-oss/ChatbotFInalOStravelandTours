@@ -108,7 +108,6 @@
 
   <script>
     // ======================== Config =========================
-    const API_KEY = "AIzaSyCduUjLNhVTo8QVBO6Dz5kpi7oFk99shX4"; // ← put your Gemini key here
     const CONTACT = `Located in: Alay Plaza
 Address: Office # 3, Aaly Plaza, Fazal-e-Haq Road, Block E G 6/2 Blue Area, Islamabad, 44000
 Phone: 051-2120700-701,0333-5542877`;
@@ -689,21 +688,11 @@ Ask me about visa price, docs, processing time — or click a country below.`);
       // 6) Gemini fallback for general travel queries
       addBot("…");
       try{
-        const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`,
-          {
-            method:"POST",
-            headers:{ "Content-Type":"application/json" },
-            body:JSON.stringify({
-              contents:[{parts:[{text:
-`You are OS Travel & Tours Assistant.
-Only answer about tourist/visit visas, air tickets, travel packages, Umrah.
-If user asks about work or study visas: politely say we do not deal.
-Keep answers short, friendly, and Pakistan-context aware.
-User: ${original}`}]}]
-            })
-          }
-        );
+        const res = await fetch('/api/proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ original: original }),
+        });
         const data = await res.json();
         const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, I didn’t get that. Please pick a country from the list.";
         messages.lastChild.innerText = reply;
